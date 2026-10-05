@@ -2,10 +2,14 @@ import React, { useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db';
 import type { ChatMessage } from '../types';
-import { Star, Bookmark, Filter, Calendar } from 'lucide-react';
+import { Star, Bookmark, Filter, Calendar, Pencil, Trash2, X, Check } from 'lucide-react';
+import { deleteMessage, editMessage } from '../services/gemini';
 
 export const FavoritesView: React.FC = () => {
   const [filterType, setFilterType] = useState<'all' | 'favorites' | 'important'>('all');
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingText, setEditingText] = useState<string>('');
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const messages = useLiveQuery(
     async () => {
@@ -29,6 +33,29 @@ export const FavoritesView: React.FC = () => {
 
   const toggleImportant = async (msg: ChatMessage) => {
     await db.messages.update(msg.id, { isImportant: !msg.isImportant });
+  };
+
+  const handleStartEdit = (msg: ChatMessage) => {
+    setEditingId(msg.id);
+    setEditingText(msg.text);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingId(null);
+    setEditingText('');
+  };
+
+  const handleSaveEdit = async (msgId: string) => {
+    if (!editingText.trim()) return;
+    const textToSave = editingText.trim();
+    setEditingId(null);
+    setEditingText('');
+    await editMessage(msgId, textToSave);
+  };
+
+  const handleConfirmDelete = async (msgId: string) => {
+    setDeletingId(null);
+    await deleteMessage(msgId);
   };
 
   return (
@@ -88,6 +115,7 @@ export const FavoritesView: React.FC = () => {
         )}
 
         {messages?.map((msg) => {
+          const isEditing = editingId === msg.id;
           const dateStr = new Date(msg.timestamp).toLocaleDateString([], {
             day: 'numeric',
             month: 'short',
@@ -110,27 +138,70 @@ export const FavoritesView: React.FC = () => {
                   <button
                     onClick={() => toggleFavorite(msg)}
                     className={`p-1 rounded-full ${
-                      msg.isFavorite ? 'text-amber-500 fill-amber-400' : 'text-stone-300'
+                      msg.isFavorite ? 'text-amber-500 fill-amber-400' : 'text-stone-300 hover:text-amber-500'
                     }`}
+                    title={msg.isFavorite ? 'Quitar de favoritos' : 'Marcar como favorito'}
                   >
                     <Star className="w-4 h-4 fill-current" />
                   </button>
                   <button
                     onClick={() => toggleImportant(msg)}
                     className={`p-1 rounded-full ${
-                      msg.isImportant ? 'text-rose-500 fill-rose-400' : 'text-stone-300'
+                      msg.isImportant ? 'text-rose-500 fill-rose-400' : 'text-stone-300 hover:text-rose-500'
                     }`}
+                    title={msg.isImportant ? 'Quitar de importante' : 'Marcar como importante'}
                   >
                     <Bookmark className="w-4 h-4 fill-current" />
+                  </button>
+                  <button
+                    onClick={() => handleStartEdit(msg)}
+                    className="p-1 rounded-full text-stone-300 hover:text-amber-800"
+                    title="Editar mensaje"
+                  >
+                    <Pencil className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => setDeletingId(msg.id)}
+                    className="p-1 rounded-full text-stone-300 hover:text-rose-600"
+                    title="Borrar mensaje"
+                  >
+                    <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
               </div>
 
-              <p className="text-sm text-stone-800 whitespace-pre-wrap leading-relaxed">
-                {msg.text}
-              </p>
+              {isEditing ? (
+                <div className="space-y-2 pt-1">
+                  <textarea
+                    value={editingText}
+                    onChange={(e) => setEditingText(e.target.value)}
+                    className="w-full p-2.5 text-sm bg-stone-50 border border-amber-300 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-amber-400 text-stone-800 resize-none"
+                    rows={3}
+                    autoFocus
+                  />
+                  <div className="flex items-center justify-end gap-2">
+                    <button
+                      onClick={handleCancelEdit}
+                      className="px-2.5 py-1 text-xs font-medium text-stone-600 bg-stone-100 hover:bg-stone-200 rounded-lg flex items-center gap-1 transition-colors"
+                    >
+                      <X className="w-3 h-3" /> Cancelar
+                    </button>
+                    <button
+                      onClick={() => handleSaveEdit(msg.id)}
+                      disabled={!editingText.trim()}
+                      className="px-2.5 py-1 text-xs font-bold text-stone-950 bg-amber-400 hover:bg-amber-500 rounded-lg flex items-center gap-1 transition-colors disabled:opacity-50"
+                    >
+                      <Check className="w-3 h-3" /> Guardar
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm text-stone-800 whitespace-pre-wrap leading-relaxed">
+                  {msg.text}
+                </p>
+              )}
 
-              {msg.geminiInsight && (
+              {msg.geminiInsight && !isEditing && (
                 <div className="mt-2 p-2.5 bg-amber-50/80 border border-amber-200/60 rounded-xl text-xs text-stone-700">
                   <span className="font-bold text-amber-900 block mb-0.5">🌻 Insight Fergirasol:</span>
                   {msg.geminiInsight}
@@ -140,6 +211,37 @@ export const FavoritesView: React.FC = () => {
           );
         })}
       </div>
+
+      {/* Confirmation Modal for Deletion in Favorites */}
+      {deletingId && (
+        <div className="fixed inset-0 z-50 bg-stone-900/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-xs w-full p-5 shadow-xl border border-amber-200 text-center space-y-4 animate-in fade-in zoom-in duration-150">
+            <div className="w-12 h-12 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto">
+              <Trash2 className="w-6 h-6" />
+            </div>
+            <div className="space-y-1">
+              <h3 className="font-bold text-stone-800 text-base">¿Borrar mensaje?</h3>
+              <p className="text-xs text-stone-500">
+                Esta acción eliminará el mensaje y actualizará el grafo de conexiones. No se puede deshacer.
+              </p>
+            </div>
+            <div className="flex items-center gap-2 pt-1">
+              <button
+                onClick={() => setDeletingId(null)}
+                className="flex-1 py-2 px-3 text-xs font-semibold text-stone-600 bg-stone-100 hover:bg-stone-200 rounded-xl transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => handleConfirmDelete(deletingId)}
+                className="flex-1 py-2 px-3 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl transition-colors shadow-xs"
+              >
+                Sí, borrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

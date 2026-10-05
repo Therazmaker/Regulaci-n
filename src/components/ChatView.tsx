@@ -2,12 +2,15 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db';
 import type { ChatMessage } from '../types';
-import { processMessageWithGemini, processPendingMessages } from '../services/gemini';
-import { Send, Star, Bookmark, Sparkles, RefreshCw, AlertCircle, CheckCircle2, Clock, Bot } from 'lucide-react';
+import { processMessageWithGemini, processPendingMessages, deleteMessage, editMessage } from '../services/gemini';
+import { Send, Star, Bookmark, Sparkles, RefreshCw, AlertCircle, CheckCircle2, Clock, Bot, Pencil, Trash2, X, Check } from 'lucide-react';
 
 export const ChatView: React.FC = () => {
   const [inputText, setInputText] = useState('');
   const [processingId, setProcessingId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingText, setEditingText] = useState<string>('');
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const messages = useLiveQuery(
@@ -71,6 +74,31 @@ export const ChatView: React.FC = () => {
     setProcessingId(null);
   };
 
+  const handleStartEdit = (msg: ChatMessage) => {
+    setEditingId(msg.id);
+    setEditingText(msg.text);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingId(null);
+    setEditingText('');
+  };
+
+  const handleSaveEdit = async (msgId: string) => {
+    if (!editingText.trim()) return;
+    const textToSave = editingText.trim();
+    setEditingId(null);
+    setEditingText('');
+    setProcessingId(msgId);
+    await editMessage(msgId, textToSave);
+    setProcessingId(null);
+  };
+
+  const handleConfirmDelete = async (msgId: string) => {
+    setDeletingId(null);
+    await deleteMessage(msgId);
+  };
+
   return (
     <div className="flex flex-col h-full bg-gradient-to-b from-amber-50/40 via-amber-50/20 to-stone-50 pb-20">
       <div className="sticky top-0 z-10 bg-white/80 backdrop-blur-md px-4 py-3 border-b border-amber-200/60 shadow-xs flex items-center justify-between">
@@ -100,12 +128,40 @@ export const ChatView: React.FC = () => {
 
         {messages?.map((msg) => {
           const isProcessing = processingId === msg.id || msg.status === 'processing';
+          const isEditing = editingId === msg.id;
           const timeStr = new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
           return (
             <div key={msg.id} className="flex flex-col gap-1.5 max-w-[90%] ml-auto">
               <div className="bg-amber-100/90 text-stone-900 border border-amber-200 rounded-2xl rounded-tr-xs p-3.5 shadow-sm relative group">
-                <p className="text-sm whitespace-pre-wrap leading-relaxed font-normal">{msg.text}</p>
+                {isEditing ? (
+                  <div className="space-y-2">
+                    <textarea
+                      value={editingText}
+                      onChange={(e) => setEditingText(e.target.value)}
+                      className="w-full p-2.5 text-sm bg-white border border-amber-300 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-amber-400 text-stone-800 resize-none"
+                      rows={3}
+                      autoFocus
+                    />
+                    <div className="flex items-center justify-end gap-2">
+                      <button
+                        onClick={handleCancelEdit}
+                        className="px-2.5 py-1 text-xs font-medium text-stone-600 bg-white/80 hover:bg-stone-200/80 rounded-lg flex items-center gap-1 transition-colors"
+                      >
+                        <X className="w-3 h-3" /> Cancelar
+                      </button>
+                      <button
+                        onClick={() => handleSaveEdit(msg.id)}
+                        disabled={!editingText.trim()}
+                        className="px-2.5 py-1 text-xs font-bold text-stone-950 bg-amber-400 hover:bg-amber-500 rounded-lg flex items-center gap-1 transition-colors disabled:opacity-50"
+                      >
+                        <Check className="w-3 h-3" /> Guardar
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-sm whitespace-pre-wrap leading-relaxed font-normal">{msg.text}</p>
+                )}
 
                 <div className="flex items-center justify-between mt-2 pt-1 border-t border-amber-200/60 text-[11px] text-amber-900/70">
                   <span className="flex items-center gap-1">
@@ -161,6 +217,22 @@ export const ChatView: React.FC = () => {
                     >
                       <Sparkles className="w-3.5 h-3.5 text-amber-700" />
                     </button>
+
+                    <button
+                      onClick={() => handleStartEdit(msg)}
+                      className="p-1 rounded-full hover:bg-amber-200/50 text-stone-400 hover:text-amber-800 transition-colors"
+                      title="Editar mensaje"
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                    </button>
+
+                    <button
+                      onClick={() => setDeletingId(msg.id)}
+                      className="p-1 rounded-full hover:bg-rose-100 text-stone-400 hover:text-rose-600 transition-colors"
+                      title="Borrar mensaje"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
                   </div>
                 </div>
               </div>
@@ -181,6 +253,37 @@ export const ChatView: React.FC = () => {
         })}
         <div ref={messagesEndRef} />
       </div>
+
+      {/* Confirmation Modal for Message Deletion */}
+      {deletingId && (
+        <div className="fixed inset-0 z-50 bg-stone-900/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-xs w-full p-5 shadow-xl border border-amber-200 text-center space-y-4 animate-in fade-in zoom-in duration-150">
+            <div className="w-12 h-12 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto">
+              <Trash2 className="w-6 h-6" />
+            </div>
+            <div className="space-y-1">
+              <h3 className="font-bold text-stone-800 text-base">¿Borrar mensaje?</h3>
+              <p className="text-xs text-stone-500">
+                Esta acción eliminará el mensaje y actualizará el grafo de conexiones. No se puede deshacer.
+              </p>
+            </div>
+            <div className="flex items-center gap-2 pt-1">
+              <button
+                onClick={() => setDeletingId(null)}
+                className="flex-1 py-2 px-3 text-xs font-semibold text-stone-600 bg-stone-100 hover:bg-stone-200 rounded-xl transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => handleConfirmDelete(deletingId)}
+                className="flex-1 py-2 px-3 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl transition-colors shadow-xs"
+              >
+                Sí, borrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <form
         onSubmit={handleSendMessage}
