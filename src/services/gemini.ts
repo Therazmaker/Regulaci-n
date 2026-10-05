@@ -222,3 +222,63 @@ export async function processPendingMessages(): Promise<void> {
     await processMessageWithGemini(msg);
   }
 }
+
+// Function to cleanup nodes and edges that are no longer associated with any message
+export async function cleanupOrphanNodesAndEdges(): Promise<void> {
+  const allMessages = await db.messages.toArray();
+  const referencedNodeIds = new Set<string>();
+  for (const msg of allMessages) {
+    if (msg.nodeIds && Array.isArray(msg.nodeIds)) {
+      for (const nid of msg.nodeIds) {
+        referencedNodeIds.add(nid);
+      }
+    }
+  }
+
+  const allNodes = await db.nodes.toArray();
+  const orphanNodeIds = allNodes.filter(n => !referencedNodeIds.has(n.id)).map(n => n.id);
+
+  if (orphanNodeIds.length > 0) {
+    const orphanSet = new Set(orphanNodeIds);
+    await db.transaction('rw', [db.nodes, db.edges], async () => {
+      for (const nid of orphanNodeIds) {
+        await db.nodes.delete(nid);
+      }
+      const allEdges = await db.edges.toArray();
+      for (const edge of allEdges) {
+        if (orphanSet.has(edge.fromNodeId) || orphanSet.has(edge.toNodeId)) {
+          await db.edges.delete(edge.id);
+        }
+      }
+    });
+  }
+}
+
+// Function to delete a message and clean up orphaned graph elements
+export async function deleteMessage(messageId: string): Promise<void> {
+  await db.messages.delete(messageId);
+  await cleanupOrphanNodesAndEdges();
+}
+
+// Function to edit a message and trigger re-classification
+export async function editMessage(messageId: string, newText: string): Promise<void> {
+  const existing = await db.messages.get(messageId);
+  if (!existing) return;
+
+  const updatedMessage: ChatMessage = {
+    ...existing,
+    text: newText,
+    status: 'pending',
+    nodeIds: [],
+    geminiInsight: undefined,
+    errorMessage: undefined
+  };
+
+  await db.messages.put(updatedMessage);
+  await cleanupOrphanNodesAndEdges();
+
+  if (navigator.onLine) {
+    await db.messages.update(messageId, { status: 'processing' });
+    await processMessageWithGemini(updatedMessage);
+  }
+}
