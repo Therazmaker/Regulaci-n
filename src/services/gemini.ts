@@ -208,6 +208,48 @@ ${contextHistory.join('\n')}
 }
 
 // Function to process all pending messages in background when online
+export async function testGeminiConnection(
+  apiKey: string,
+  modelName: string = DEFAULT_GEMINI_MODEL
+): Promise<{ success: boolean; error?: string }> {
+  if (!apiKey || !apiKey.trim()) {
+    return { success: false, error: 'Por favor, ingresa una API Key válida.' };
+  }
+
+  try {
+    const ai = new GoogleGenAI({ apiKey: apiKey.trim() });
+    await ai.models.generateContent({
+      model: modelName || DEFAULT_GEMINI_MODEL,
+      contents: 'Hola',
+      config: {
+        maxOutputTokens: 5
+      }
+    });
+
+    return { success: true };
+  } catch (err: any) {
+    console.error('Error al probar conexión con Gemini:', err);
+    let msg = err.message || 'Error de conexión con la API de Gemini.';
+    if (typeof msg === 'string') {
+      const jsonStart = msg.indexOf('{');
+      if (jsonStart !== -1) {
+        try {
+          const parsed = JSON.parse(msg.substring(jsonStart));
+          if (parsed?.error?.message) {
+            msg = parsed.error.message;
+          }
+        } catch {
+          // keep original if parsing fails
+        }
+      }
+    }
+    return {
+      success: false,
+      error: msg
+    };
+  }
+}
+
 export async function processPendingMessages(): Promise<void> {
   const apiKey = await getSetting('gemini_api_key', '');
   if (!apiKey || !navigator.onLine) return;

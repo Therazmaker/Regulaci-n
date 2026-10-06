@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { getSetting, setSetting, exportBackupData, importBackupData } from '../db';
-import { DEFAULT_GEMINI_MODEL } from '../services/gemini';
-import { Settings, Key, Download, Upload, CheckCircle, AlertTriangle, RefreshCw } from 'lucide-react';
+import { DEFAULT_GEMINI_MODEL, testGeminiConnection } from '../services/gemini';
+import { Settings, Key, Download, Upload, CheckCircle, AlertTriangle, RefreshCw, Activity, Loader2 } from 'lucide-react';
 
 export const SettingsView: React.FC = () => {
   const [apiKey, setApiKey] = useState('');
@@ -9,6 +9,9 @@ export const SettingsView: React.FC = () => {
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [importSuccess, setImportSuccess] = useState('');
+
+  const [testingConnection, setTestingConnection] = useState(false);
+  const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
 
   useEffect(() => {
     async function loadSettings() {
@@ -32,6 +35,27 @@ export const SettingsView: React.FC = () => {
       setTimeout(() => setSavedSuccess(false), 3000);
     } catch (err: any) {
       setErrorMsg(err.message || 'Error guardando ajustes');
+    }
+  };
+
+  const handleTestConnection = async () => {
+    setTestingConnection(true);
+    setTestResult(null);
+    setErrorMsg('');
+
+    const res = await testGeminiConnection(apiKey, model);
+    setTestingConnection(false);
+
+    if (res.success) {
+      setTestResult({
+        success: true,
+        message: '¡Conexión exitosa con la API de Gemini!'
+      });
+    } else {
+      setTestResult({
+        success: false,
+        message: res.error || 'No se pudo conectar con la API de Gemini.'
+      });
     }
   };
 
@@ -140,6 +164,23 @@ export const SettingsView: React.FC = () => {
               </div>
             )}
 
+            {testResult && (
+              <div
+                className={`p-2.5 text-xs rounded-xl flex items-center gap-1.5 border ${
+                  testResult.success
+                    ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                    : 'bg-rose-50 border-rose-200 text-rose-700'
+                }`}
+              >
+                {testResult.success ? (
+                  <CheckCircle className="w-4 h-4 shrink-0 text-emerald-600" />
+                ) : (
+                  <AlertTriangle className="w-4 h-4 shrink-0 text-rose-600" />
+                )}
+                <span>{testResult.message}</span>
+              </div>
+            )}
+
             {errorMsg && (
               <div className="p-2.5 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl flex items-center gap-1.5">
                 <AlertTriangle className="w-4 h-4 shrink-0" />
@@ -147,12 +188,33 @@ export const SettingsView: React.FC = () => {
               </div>
             )}
 
-            <button
-              type="submit"
-              className="w-full py-2.5 px-4 bg-amber-500 hover:bg-amber-600 text-stone-950 font-bold text-xs rounded-xl transition-all shadow-xs"
-            >
-              Guardar Configuración
-            </button>
+            <div className="grid grid-cols-2 gap-2 pt-1">
+              <button
+                type="button"
+                onClick={handleTestConnection}
+                disabled={testingConnection}
+                className="py-2.5 px-3 bg-stone-100 hover:bg-stone-200 text-stone-800 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-all disabled:opacity-50"
+              >
+                {testingConnection ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin text-amber-600" />
+                    <span>Probando...</span>
+                  </>
+                ) : (
+                  <>
+                    <Activity className="w-4 h-4 text-amber-600" />
+                    <span>Probar conexión</span>
+                  </>
+                )}
+              </button>
+
+              <button
+                type="submit"
+                className="py-2.5 px-3 bg-amber-500 hover:bg-amber-600 text-stone-950 font-bold text-xs rounded-xl transition-all shadow-xs flex items-center justify-center"
+              >
+                Guardar Configuración
+              </button>
+            </div>
           </form>
         </div>
 
