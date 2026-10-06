@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getSetting, setSetting, exportBackupData, importBackupData } from '../db';
-import { DEFAULT_GEMINI_MODEL, testGeminiConnection } from '../services/gemini';
+import { DEFAULT_GEMINI_MODEL, testGeminiConnection, processPendingMessages } from '../services/gemini';
 import { Settings, Key, Download, Upload, CheckCircle, AlertTriangle, RefreshCw, Activity, Loader2 } from 'lucide-react';
 
 export const SettingsView: React.FC = () => {
@@ -32,6 +32,7 @@ export const SettingsView: React.FC = () => {
       await setSetting('gemini_api_key', apiKey.trim());
       await setSetting('gemini_model', model);
       setSavedSuccess(true);
+      processPendingMessages();
       setTimeout(() => setSavedSuccess(false), 3000);
     } catch (err: any) {
       setErrorMsg(err.message || 'Error guardando ajustes');

@@ -250,9 +250,47 @@ export async function testGeminiConnection(
   }
 }
 
+export async function reprocessAllUnclassifiedMessages(): Promise<{ total: number; processed: number }> {
+  const apiKey = await getSetting('gemini_api_key', '');
+  if (!apiKey || !navigator.onLine) {
+    return { total: 0, processed: 0 };
+  }
+
+  // Reset any stuck 'processing' messages or 'error' / 'pending' messages back to pending
+  const allMessages = await db.messages.toArray();
+  const unclassified = allMessages.filter(m => m.status !== 'classified');
+
+  if (unclassified.length === 0) {
+    return { total: 0, processed: 0 };
+  }
+
+  for (const msg of unclassified) {
+    await db.messages.update(msg.id, { status: 'pending', errorMessage: undefined });
+  }
+
+  let processedCount = 0;
+  for (const msg of unclassified) {
+    await db.messages.update(msg.id, { status: 'processing' });
+    const res = await processMessageWithGemini(msg);
+    if (res.success) {
+      processedCount++;
+    }
+    // Small delay between requests to avoid Gemini rate limits on batch processing
+    await new Promise(resolve => setTimeout(resolve, 800));
+  }
+
+  return { total: unclassified.length, processed: processedCount };
+}
+
 export async function processPendingMessages(): Promise<void> {
   const apiKey = await getSetting('gemini_api_key', '');
   if (!apiKey || !navigator.onLine) return;
+
+  // Reset any messages stuck in 'processing' (e.g. from app close or net drop) to 'pending'
+  const stuckMessages = await db.messages.where('status').equals('processing').toArray();
+  for (const msg of stuckMessages) {
+    await db.messages.update(msg.id, { status: 'pending' });
+  }
 
   const pendingMessages = await db.messages
     .where('status')
@@ -262,6 +300,7 @@ export async function processPendingMessages(): Promise<void> {
   for (const msg of pendingMessages) {
     await db.messages.update(msg.id, { status: 'processing' });
     await processMessageWithGemini(msg);
+    await new Promise(resolve => setTimeout(resolve, 500));
   }
 }
 
