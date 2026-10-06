@@ -2,12 +2,13 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db';
 import type { ChatMessage } from '../types';
-import { processMessageWithGemini, processPendingMessages, deleteMessage, editMessage } from '../services/gemini';
-import { Send, Star, Bookmark, Sparkles, RefreshCw, AlertCircle, CheckCircle2, Clock, Bot, Pencil, Trash2, X, Check } from 'lucide-react';
+import { processMessageWithGemini, processPendingMessages, deleteMessage, editMessage, reprocessAllUnclassifiedMessages } from '../services/gemini';
+import { Send, Star, Bookmark, Sparkles, RefreshCw, AlertCircle, CheckCircle2, Clock, Bot, Pencil, Trash2, X, Check, Play } from 'lucide-react';
 
 export const ChatView: React.FC = () => {
   const [inputText, setInputText] = useState('');
   const [processingId, setProcessingId] = useState<string | null>(null);
+  const [isBatchProcessing, setIsBatchProcessing] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState<string>('');
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -17,6 +18,8 @@ export const ChatView: React.FC = () => {
     () => db.messages.orderBy('timestamp').toArray(),
     []
   );
+
+  const unclassifiedCount = messages ? messages.filter(m => m.status !== 'classified').length : 0;
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -99,6 +102,13 @@ export const ChatView: React.FC = () => {
     await deleteMessage(msgId);
   };
 
+  const handleReprocessAll = async () => {
+    if (isBatchProcessing) return;
+    setIsBatchProcessing(true);
+    await reprocessAllUnclassifiedMessages();
+    setIsBatchProcessing(false);
+  };
+
   return (
     <div className="flex flex-col h-full bg-gradient-to-b from-amber-50/40 via-amber-50/20 to-stone-50 pb-20">
       <div className="sticky top-0 z-10 bg-white/80 backdrop-blur-md px-4 py-3 border-b border-amber-200/60 shadow-xs flex items-center justify-between">
@@ -114,6 +124,30 @@ export const ChatView: React.FC = () => {
       </div>
 
       <div className="flex-1 overflow-y-auto px-3 py-4 space-y-4">
+        {unclassifiedCount > 0 && (
+          <div className="bg-amber-100/90 border border-amber-300 rounded-2xl p-3 shadow-xs flex items-center justify-between gap-2 text-xs text-amber-900">
+            <div className="flex items-center gap-2">
+              <RefreshCw className={`w-4 h-4 text-amber-700 ${isBatchProcessing ? 'animate-spin' : ''}`} />
+              <span>
+                Tienes <strong>{unclassifiedCount}</strong> mensaje(s) pendiente(s) o sin clasificar.
+              </span>
+            </div>
+            <button
+              onClick={handleReprocessAll}
+              disabled={isBatchProcessing}
+              className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-stone-950 font-bold rounded-xl flex items-center gap-1 transition-all disabled:opacity-50 shrink-0 shadow-2xs"
+            >
+              {isBatchProcessing ? (
+                <span>Procesando...</span>
+              ) : (
+                <>
+                  <Play className="w-3.5 h-3.5 fill-current" />
+                  <span>Procesar todo</span>
+                </>
+              )}
+            </button>
+          </div>
+        )}
         {(!messages || messages.length === 0) && (
           <div className="text-center my-12 px-6">
             <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-3 text-amber-600">
