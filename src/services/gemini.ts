@@ -103,10 +103,9 @@ Tu propósito es tomar los pensamientos, miedos, notas de astrología, o desregu
    - Categorías válidas: 'emocion', 'sintoma_fisico', 'astrologia', 'patron', 'idea', 'relacion', 'otro'.
    - OBLIGATORIO: Si el concepto ya coincide con la lista de [NODOS EXISTENTES], REUTILIZA exactamente el mismo 'id'. Evita crear nodos duplicados o redundantes.
 2. Crear conexiones (edges) entre esos nodos únicamente cuando exista una relación causal o correlación muy clara.
-3. Generar un 'insight' cálido, amoroso, sin juicios y estilo hermana girasol 🌻.
-   CRITERIO MUY ESTRICTO PARA RESPONDER / INSIGHTS:
-   - ${forceInsight ? 'SE HA SOLICITADO FORZAR RESPUESTA: Proporciona un mensaje amoroso de contención y aterrizaje obligatoriamente (hasInsight = true).' : 'Sé selectivo: SOLO establece hasInsight = true si el mensaje expresa una desregulación emocional profunda, una vulnerabilidad clara o la detección de un patrón clave. Para notas sencillas, resúmenes, saludos, ideas o textos de organización, pon HASINSIGHT = FALSE (message = undefined) para no sobrecargar el chat.'}
-   - Si respondes (hasInsight = true), mantén un tono sumamente empático, amoroso y contenedor.
+3. Generar un 'insight' cuando sea explícitamente solicitado:
+   CRITERIO OBLIGATORIO PARA RESPONDER / INSIGHTS:
+   - ${forceInsight ? 'HA SIDO SOLICITADO MANUALMENTE UN ATERRIZAJE (forceInsight = true). DEBES responder (hasInsight = true). Tu mensaje debe ser BREVE (máximo 2 a 3 oraciones), cercano y centrado en ATERRIZAR a Fergis. Señálale la similitud o patrón con experiencias/notas previas, recordándole amorosamente que esto ya ha ocurrido antes y que todo está bien y va a estar bien.' : 'NO GENERES MENSAJE DE TEXTO (hasInsight = false, message = undefined). La clasificación automática de la bitácora NO debe incluir respuesta de texto en el chat a menos que la usuaria lo pida de forma manual presionado el botón.'}
 `;
 
   const prompt = `
