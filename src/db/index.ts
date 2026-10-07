@@ -10,7 +10,7 @@ export class FergisDatabase extends Dexie {
   constructor() {
     super('FergisAppDB');
     this.version(1).stores({
-      messages: 'id, timestamp, status, isFavorite, isImportant',
+      messages: 'id, timestamp, status, isFavorite, isImportant, *nodeIds',
       nodes: 'id, label, category, updatedAt',
       edges: 'id, fromNodeId, toNodeId, [fromNodeId+toNodeId]',
       settings: 'key'

@@ -63,23 +63,37 @@ export const GraphView: React.FC = () => {
     const data = { nodes: visNodes, edges: visEdges };
     const options = {
       physics: {
+        enabled: true,
         solver: 'forceAtlas2Based',
         forceAtlas2Based: {
-          gravitationalConstant: -35,
+          gravitationalConstant: -30,
           centralGravity: 0.01,
-          springLength: 100,
+          springLength: 80,
           springConstant: 0.08,
+          damping: 0.4,
         },
-        stabilization: { iterations: 150 },
+        stabilization: {
+          enabled: true,
+          iterations: 100,
+          updateInterval: 25,
+        },
       },
       interaction: {
-        hover: true,
+        hover: false,
         zoomView: true,
         dragView: true,
+        dragNodes: true,
+        hideEdgesOnDrag: true,
+        hideEdgesOnZoom: true,
       },
     };
 
     const network = new NetworkViz(containerRef.current, data as any, options as any);
+
+    // Disable physics engine after stabilization so dragging, zooming, and panning are super fluid and fast
+    network.once('stabilizationIterationsDone', () => {
+      network.setOptions({ physics: { enabled: false } });
+    });
 
     network.on('click', async (params) => {
       if (params.nodes && params.nodes.length > 0) {
@@ -87,9 +101,10 @@ export const GraphView: React.FC = () => {
         const clickedNode = nodes.find((n) => n.id === nodeId);
         if (clickedNode) {
           setSelectedNode(clickedNode);
-          // Find all messages that contain this nodeId
+          // Query indexed nodeIds for instant response
           const msgs = await db.messages
-            .filter((m) => m.nodeIds && m.nodeIds.includes(nodeId))
+            .where('nodeIds')
+            .equals(nodeId)
             .reverse()
             .sortBy('timestamp');
           setRelatedMessages(msgs);
