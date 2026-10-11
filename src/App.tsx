@@ -1,12 +1,14 @@
-import { useState } from 'react';
+import { useState, lazy, Suspense } from 'react';
 import { BottomNav } from './components/BottomNav';
 import type { TabType } from './components/BottomNav';
 import { ChatView } from './components/ChatView';
 import { FavoritesView } from './components/FavoritesView';
-import { GraphView } from './components/GraphView';
 import { SettingsView } from './components/SettingsView';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from './db';
+import { Network } from 'lucide-react';
+
+const GraphView = lazy(() => import('./components/graph/GraphView'));
 
 export function App() {
   const [activeTab, setActiveTab] = useState<TabType>('chat');
@@ -21,7 +23,18 @@ export function App() {
       <main className="flex-1 flex flex-col h-full overflow-hidden">
         {activeTab === 'chat' && <ChatView />}
         {activeTab === 'favorites' && <FavoritesView />}
-        {activeTab === 'graph' && <GraphView />}
+        {activeTab === 'graph' && (
+          <Suspense
+            fallback={
+              <div className="flex flex-col h-full bg-stone-50 items-center justify-center">
+                <Network className="w-10 h-10 text-amber-400 animate-pulse mb-2" />
+                <p className="text-xs font-medium text-stone-500">Cargando módulo de grafo...</p>
+              </div>
+            }
+          >
+            <GraphView />
+          </Suspense>
+        )}
         {activeTab === 'settings' && <SettingsView />}
       </main>
 
