@@ -116,10 +116,9 @@ export const FavoritesView: React.FC = () => {
 
         {messages?.map((msg) => {
           const isEditing = editingId === msg.id;
-          const dateStr = new Date(msg.timestamp).toLocaleDateString([], {
+          const dateStr = new Date(msg.timestamp).toLocaleString([], {
             day: 'numeric',
             month: 'short',
-            year: 'numeric',
             hour: '2-digit',
             minute: '2-digit'
           });

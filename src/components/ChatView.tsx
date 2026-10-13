@@ -163,7 +163,12 @@ export const ChatView: React.FC = () => {
         {messages?.map((msg) => {
           const isProcessing = processingId === msg.id || msg.status === 'processing';
           const isEditing = editingId === msg.id;
-          const timeStr = new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          const dateStr = new Date(msg.timestamp).toLocaleString([], {
+            day: 'numeric',
+            month: 'short',
+            hour: '2-digit',
+            minute: '2-digit'
+          });
 
           return (
             <div key={msg.id} className="flex flex-col gap-1.5 max-w-[90%] ml-auto">
@@ -199,7 +204,7 @@ export const ChatView: React.FC = () => {
 
                 <div className="flex items-center justify-between mt-2 pt-1 border-t border-amber-200/60 text-[11px] text-amber-900/70">
                   <span className="flex items-center gap-1">
-                    {timeStr}
+                    {dateStr}
                     {msg.status === 'pending' && (
                       <span className="flex items-center gap-0.5 text-amber-700 ml-1" title="Pendiente de conexión/clasificación">
                         <Clock className="w-3 h-3" />
